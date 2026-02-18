@@ -147,17 +147,28 @@ def is_tcp_connected(result) -> bool:
 def is_icmp_connected(result) -> bool:
     """
     Check if an ICMP (ping) node result indicates a successful reply.
-    ICMP result format: [[ping_ms, "OK"], [ping_ms, "OK"], ...]  or null
-    A node is considered reachable if at least one ping reply succeeded.
+
+    Actual API format (double-nested):
+        result = [                        <- node result (outer list, always 1 element)
+            [                             <- list of ping attempts
+                ["OK", time_ms, ip],      <- ping 1 (IP only on first entry)
+                ["OK", time_ms],          <- ping 2..4
+                ...
+            ]
+        ]
+    A node is reachable if at least one ping attempt has status "OK".
     """
     if result is None:
         return False
+    # Unwrap outer list: result[0] is the list of ping attempts
     if isinstance(result, list) and len(result) > 0:
-        for ping in result:
-            # Each ping entry: [time_ms, "OK"] on success, or [null, "TIMEOUT"] on fail
-            if isinstance(ping, list) and len(ping) >= 2:
-                if ping[1] == "OK" and ping[0] is not None:
-                    return True
+        ping_attempts = result[0]
+        if isinstance(ping_attempts, list):
+            for ping in ping_attempts:
+                # Each ping: ["OK", time_ms] or ["OK", time_ms, ip] on success
+                if isinstance(ping, list) and len(ping) >= 2:
+                    if ping[0] == "OK" and ping[1] is not None:
+                        return True
     return False
 
 
